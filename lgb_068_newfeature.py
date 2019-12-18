@@ -122,7 +122,16 @@ data.loc[~data['newsid'].isna(), 'isLog'] = 1
 data.loc[data['newsid'].isna(), 'isLog'] = 0
 
 # 缺失值填充
-data['guid'] = data['guid'].fillna('abc')
+# data['guid'] = data['guid'].fillna('abc')
+
+def find_top1_in_group(x):
+    if x.count() <= 0:
+        return np.nan
+    return x.value_counts().index[0]
+
+
+data['guid'] = data.groupby('deviceid')['guid'].transform(find_top1_in_group)
+data['guid'] = data['guid'].fillna(data['guid'].value_counts().idxmax())
 
 # 构造历史特征 分别统计前一天 guid deviceid 的相关信息
 # 8 9 10 11
@@ -248,18 +257,13 @@ def ctr_caculate(click, show):
 for col in [['deviceid'], ['guid'], ['newsid']]:
     print("处理当前一天内的特征，当前col:", col)
     days_count_col_name = '{}_days_count'.format('_'.join(col))
-    days_click_col_name = '{}_days_click_count'.format('_'.join(col))
-    days_ctr_col_name = '{}_days_ctr'.format('_'.join(col))
-
     data[days_count_col_name] = data.groupby(['days'] + col)['id'].transform('count')
-    data[days_click_col_name] = \
-        data[data['target'] == 1].groupby(['days'] + col)['id'].transform('count')
     data['{}_hours_count'.format('_'.join(col))] = data.groupby(['hour'] + col)['id'].transform('count')
 
-    data[days_ctr_col_name] = data.apply(lambda row: ctr_caculate(row[days_click_col_name], row[days_count_col_name]),
-                                         axis=1)
-    print(data[days_ctr_col_name])
+newsid_days_click_count = 'newsid_days_click_count'
+data[newsid_days_click_count] = data[data['target'] == 1].groupby(['days'] + col)['newsid'].transform('count')
 
+print(data[newsid_days_click_count])
 
 # netmodel
 data['netmodel'] = data['netmodel'].map({'o': 1, 'w': 2, 'g4': 4, 'g3': 3, 'g2': 2})
@@ -299,8 +303,8 @@ feature = [
     'guid_timestamp_ts_min', 'guid_timestamp_ts_median',
     'deviceid_days_count', 'guid_days_count', 'newsid_days_count',
     'deviceid_hours_count', 'guid_hours_count', 'newsid_hours_count',
-    'deviceid_days_click_count', 'guid_days_click_count', 'newsid_days_click_count',
-    'deviceid_days_ctr', 'guid_days_ctr', 'newsid_days_ctr',
+    # 'deviceid_days_click_count', 'guid_days_click_count', 'newsid_days_click_count',
+    # 'deviceid_days_ctr', 'guid_days_ctr', 'newsid_days_ctr',
     'ts_next_ts',
     'newsid', 'app_version', 'device_vendor', 'osversion', 'device_version'
 ]
