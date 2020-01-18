@@ -26,7 +26,7 @@ path_result = path + 'result/'
 path_pickle = path + 'pickle/'
 path_profile = path + 'profile/'
 
-debug_small = True
+debug_small = False
 if debug_small:
     train = pd.read_pickle(path_pickle + 'train_small.pickle')
     test = pd.read_pickle(path_pickle + 'test_small.pickle')
@@ -44,10 +44,12 @@ print(tabulate(train.head(20), headers='keys', tablefmt='psql'))
 
 all_data = pd.concat((train, test)).reset_index(drop=True)
 
-all_data_na = (all_data.isnull().sum() / len(all_data)) * 100
-all_data_na = all_data_na.drop(all_data_na[all_data_na == 0].index).sort_values(ascending=False)[:30]
-missing_data = pd.DataFrame({'Missing Ratio': all_data_na})
-print(missing_data.head(20))
+
+#missing data
+total = all_data.isnull().sum().sort_values(ascending=False)
+percent = (all_data.isnull().sum()/all_data.isnull().count()).sort_values(ascending=False)
+missing_data = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
+missing_data.head(20)
 
 
 def find_top1_in_group(x):

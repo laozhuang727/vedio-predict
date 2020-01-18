@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 import time, datetime
 import lightgbm as lgb
+from scipy import stats
 from sklearn.metrics import f1_score
 from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
@@ -86,6 +87,8 @@ test['datetime'] = test['ts'].apply(time_data2)
 train['datetime'] = pd.to_datetime(train['datetime'])
 test['datetime'] = pd.to_datetime(test['datetime'])
 
+train.loc[(train[['timestamp', 'deviceid', 'newsid']].duplicated()) & (-train['timestamp'].isna()), 'target'] = 0
+
 # 时间范围
 # train min: 2019-11-08 00:01:07, train max: 2019-11-10 23:55:51
 # train min: 2019-11-11 00:00:00, train max: 2019-11-11 23:59:44
@@ -102,6 +105,7 @@ print("train min: {0}, train max: {1}".format(test['datetime'].min(), test['date
 # 10    3958109
 # 11    3653592
 
+
 train['days'] = train['datetime'].dt.day
 test['days'] = test['datetime'].dt.day
 
@@ -112,6 +116,55 @@ test['flag'] = 11
 data = pd.concat([train, test], axis=0, sort=False)
 del train, test
 
+data = data.sort_values(['deviceid', 'ts']).reset_index().drop('index', axis=1)
+
+# 把相隔广告曝光相隔时间较短的数据视为同一个事件，这里暂取间隔为3min
+# rank按时间排序同一个事件中每条数据发生的前后关系
+# 把相隔广告曝光相隔时间较短的数据视为同一个事件，这里暂取间隔为3min
+# rank按时间排序同一个事件中每条数据发生的前后关系
+group = data.groupby('deviceid')
+data['gap_before'] = group['ts'].shift(0) - group['ts'].shift(1)
+data['gap_before'] = data['gap_before'].fillna(3 * 60 * 1000)
+INDEX = data[data['gap_before'] > (3 * 60 * 1000 - 1)].index
+data['gap_before'] = np.log(data['gap_before'] // 1000 + 1)
+data['gap_before_int'] = np.rint(data['gap_before'])
+LENGTH = len(INDEX)
+ts_group = []
+ts_len = []
+for i in tqdm(range(1, LENGTH)):
+    ts_group += [i - 1] * (INDEX[i] - INDEX[i - 1])
+    ts_len += [(INDEX[i] - INDEX[i - 1])] * (INDEX[i] - INDEX[i - 1])
+ts_group += [LENGTH - 1] * (len(data) - INDEX[LENGTH - 1])
+ts_len += [(len(data) - INDEX[LENGTH - 1])] * (len(data) - INDEX[LENGTH - 1])
+data['ts_before_group'] = ts_group
+data['ts_before_len'] = ts_len
+data['ts_before_rank'] = group['ts'].apply(lambda x: (x).rank())
+data['ts_before_rank'] = (data['ts_before_rank'] - 1) / \
+                         (data['ts_before_len'] - 1)
+
+group = data.groupby('deviceid')
+data['gap_after'] = group['ts'].shift(-1) - group['ts'].shift(0)
+data['gap_after'] = data['gap_after'].fillna(3 * 60 * 1000)
+INDEX = data[data['gap_after'] > (3 * 60 * 1000 - 1)].index
+data['gap_after'] = np.log(data['gap_after'] // 1000 + 1)
+data['gap_after_int'] = np.rint(data['gap_after'])
+LENGTH = len(INDEX)
+ts_group = [0] * (INDEX[0] + 1)
+ts_len = [INDEX[0]] * (INDEX[0] + 1)
+for i in tqdm(range(1, LENGTH)):
+    ts_group += [i] * (INDEX[i] - INDEX[i - 1])
+    ts_len += [(INDEX[i] - INDEX[i - 1])] * (INDEX[i] - INDEX[i - 1])
+data['ts_after_group'] = ts_group
+data['ts_after_len'] = ts_len
+data['ts_after_rank'] = group['ts'].apply(lambda x: (-x).rank())
+data['ts_after_rank'] = (data['ts_after_rank'] - 1) / (data['ts_after_len'] - 1)
+
+data.loc[data['ts_before_rank'] == np.inf, 'ts_before_rank'] = 0
+data.loc[data['ts_after_rank'] == np.inf, 'ts_after_rank'] = 0
+data['ts_before_len'] = np.log(data['ts_before_len'] + 1)
+data['ts_after_len'] = np.log(data['ts_after_len'] + 1)
+
+
 # 小时信息
 data['hour'] = data['datetime'].dt.hour
 data['minute'] = data['datetime'].dt.minute
@@ -121,7 +174,7 @@ data['hour_min_time'] = np.int64(data['hour']) * 60 + np.int64(data['minute'])
 data.loc[~data['newsid'].isna(), 'isLog'] = 1
 data.loc[data['newsid'].isna(), 'isLog'] = 0
 
-# 缺失值填充
+# gui 缺失值填充, 选相同的deviceid来填
 # data['guid'] = data['guid'].fillna('abc')
 
 def find_top1_in_group(x):
@@ -132,6 +185,8 @@ def find_top1_in_group(x):
 
 data['guid'] = data.groupby('deviceid')['guid'].transform(find_top1_in_group)
 data['guid'] = data['guid'].fillna(data['guid'].value_counts().idxmax())
+
+
 
 # 构造历史特征 分别统计前一天 guid deviceid 的相关信息
 # 8 9 10 11
@@ -268,6 +323,21 @@ print(data[newsid_days_click_count])
 # netmodel
 data['netmodel'] = data['netmodel'].map({'o': 1, 'w': 2, 'g4': 4, 'g3': 3, 'g2': 2})
 
+data['lat_int'] = np.int64(np.rint(data['lat'] * 100))
+data['lng_int'] = np.int64(np.rint(data['lng'] * 100))
+group = data[['deviceid', 'lat', 'lng']].groupby('deviceid')
+gp = group[['lat', 'lng']].agg(lambda x: stats.mode(x)[0][0]).reset_index()
+gp.columns = ['deviceid', 'lat_mode', 'lng_mode']
+data = pd.merge(data, gp, on='deviceid', how='left')
+data['dist'] = np.log((data['lat'] - data['lat_mode']) **
+                      2 + (data['lng'] - data['lng_mode']) ** 2 + 1)
+data['dist_int'] = np.rint(data['dist'])
+data.loc[data['lat'] != data['lat_mode'], 'isLatSame'] = 0
+data.loc[data['lat'] == data['lat_mode'], 'isLatSame'] = 1
+data.loc[data['lng'] != data['lng_mode'], 'isLngSame'] = 0
+data.loc[data['lng'] == data['lng_mode'], 'isLngSame'] = 1
+
+
 # posobject_col = [i for i in data.sele
 # data['pos'] = data['pos']
 
@@ -306,7 +376,11 @@ feature = [
     # 'deviceid_days_click_count', 'guid_days_click_count', 'newsid_days_click_count',
     # 'deviceid_days_ctr', 'guid_days_ctr', 'newsid_days_ctr',
     'ts_next_ts',
-    'newsid', 'app_version', 'device_vendor', 'osversion', 'device_version'
+    'newsid', 'app_version', 'device_vendor', 'osversion', 'device_version',
+    'ts_before_rank','ts_after_rank','gap_after_int', 'ts_after_group',
+    'dist_int',
+    'lat_int', 'lng_int'
+    # 'personidentification'
 ]
 target = 'target'
 
