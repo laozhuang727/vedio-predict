@@ -24,7 +24,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
 
-path = "/Users/ryan/Downloads/data/"
+path = "/media/ryan/F/deep-learning-data/turing/vedio-predict/"
 path_sub = path + 'sub/'
 path_npy = path + 'npy/'
 path_data = path + 'raw/'
@@ -35,7 +35,7 @@ hdf5_pickle = path + 'hdf5/'
 path_profile = path + 'profile/'
 import vaex as vx
 
-debug_samll = True
+debug_samll = False
 debug_nrow = 10000
 
 
@@ -48,6 +48,10 @@ def build_pickle():
         test = pd.read_csv(path_data + 'test.csv', nrows=debug_nrow)
         test.to_pickle(path_pickle + "test_small.pickle")
         print("success build test_small.pickle")
+
+        sample = pd.read_csv(path_data + 'sample.csv', nrows=debug_nrow)
+        sample.to_pickle(path_pickle + "sample_small.pickle")
+        print("success build sample_small.pickle")
 
         app = pd.read_csv(path_data + 'app.csv', nrows=debug_nrow)
         app.to_pickle(path_pickle + "app_small.pickle")
@@ -64,6 +68,10 @@ def build_pickle():
         test = pd.read_csv(path_data + 'test.csv')
         test.to_pickle(path_pickle + "test.pickle")
         print("success build test.pickle")
+
+        sample = pd.read_csv(path_data + 'sample.csv')
+        sample.to_pickle(path_pickle + "sample.pickle")
+        print("success build sample.pickle")
 
         app = pd.read_csv(path_data + 'app.csv')
         app.to_pickle(path_pickle + "app.pickle")
@@ -168,4 +176,5 @@ if __name__ == '__main__':
     # path = os.path.expanduser(path_npy)
     # test_np_save()
 
-    test_concat()
+    # test_concat()
+    build_pickle()

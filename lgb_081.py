@@ -34,7 +34,7 @@ from core.utils import timeit, reduce_mem
 ##################################################################################################################
 
 
-path = "/Users/ryan/Downloads/data/"
+path = "/media/ryan/F/deep-learning-data/turing/vedio-predict/"
 path_sub = path + 'sub/'
 path_npy = path + 'npy/'
 path_data = path + 'raw/'
@@ -44,17 +44,25 @@ path_pickle = path + 'pickle/'
 path_profile = path + 'profile/'
 
 debug_small = False
-
+sub_sample = False
 if debug_small:
     train_df = pd.read_pickle(path_pickle + 'train_small.pickle')
     test_df = pd.read_pickle(path_pickle + 'test_small.pickle')
     # app = pd.read_pickle(path_pickle + 'app_small.pickle')
     # user = pd.read_pickle(path_pickle + 'user_small.pickle')
+
 else:
     train_df = pd.read_pickle(path_pickle + 'train.pickle')
     test_df = pd.read_pickle(path_pickle + 'test.pickle')
+
+
     # app = pd.read_pickle(path_pickle + 'app.pickle')
     # user = pd.read_pickle(path_pickle + 'user.pickle')
+
+    if sub_sample:
+        train_df = train_df[train_df.deviceid.str[-1] == '1']
+        test_df = test_df[test_df.deviceid.str[-1] == '1']
+
 
 print('=============================================== read train ===============================================')
 t = time.time()
@@ -298,7 +306,8 @@ print('runtime:', time.time() - t)
 print('========================================================================================================')
 
 
-
+# train_df.to_pickle(path_pickle + "81_01_final_train.pickle")
+# test_df.to_pickle(path_pickle + "81_01_final_test.pickle")
 
 print('=============================================== training validate ===============================================')
 fea_imp_list = []
@@ -351,7 +360,8 @@ print('runtime:', time.time() - t)
 
 print('************** test predict **************')
 sub = pd.read_csv(path_data + 'sample.csv')
-sub['target'] = clf.predict_proba(test_df)[:, 1]
+# sub['target'] = clf.predict_proba(test_df)[:, 1]
+tmp_df = clf.predict_proba(test_df)[:, 1]
 fea_imp_list.append(clf.feature_importances_)
 print('runtime:', time.time() - t)
 

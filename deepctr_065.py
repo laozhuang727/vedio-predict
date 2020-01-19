@@ -49,7 +49,7 @@ from deepctr.models import DeepFM
 from deepctr.inputs import SparseFeat, DenseFeat, get_feature_names, VarLenSparseFeat
 
 from collections import namedtuple
-from bayes_opt import BayesianOptimization
+# from bayes_opt import BayesianOptimization
 
 # 多个变量显示
 from IPython.core.interactiveshell import InteractiveShell
