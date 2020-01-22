@@ -13,7 +13,7 @@ from keras.preprocessing import image
 from tensorflow.keras import backend as K
 from tensorflow.keras.applications.vgg16 import preprocess_input
 
-img_path = "img/6.png"
+img_path = "img/4.png"
 image_size = 224
 
 # Load pre-trained Keras model and the image to classify
@@ -24,7 +24,7 @@ model = tf.keras.applications.vgg16.VGG16()
 # 由于我们只通过网络传递一个图像，因此需要扩展第一个维度，将其扩展为一个大小为 1 的批量。
 # 然后，我们通过辅助函数 preprocess_input 从输入图像中减去平均 RGB 值来实现图像的归一化。值来实现图像的归一化
 
-img = image.load_img(img_path, target_size=(224, 224))
+img = image.load_img(img_path, target_size=(image_size, image_size))
 x = image.img_to_array(img)
 x = np.expand_dims(x, axis=0)
 x = preprocess_input(x)
@@ -34,21 +34,27 @@ x = preprocess_input(x)
 preds = model.predict(x)
 class_idx = np.argmax(preds[0])
 class_output = model.output[:, class_idx]
-last_conv_layer = model.get_layer("block5_conv3")
+last_conv_layer = model.get_layer("block5_conv3")   ##14×14×512
 
 # 我们计算相类输出值关于特征图的梯度。然后，我们沿着除了通道维度之外的轴对梯度进行池化操作。最后，我们用计算出的梯度值对输出特征图加权。
-grads = K.gradients(class_output, last_conv_layer.output)[0]
-pooled_grads = K.mean(grads, axis=(0, 1, 2))
+grads = K.gradients(class_output, last_conv_layer.output)[0]    ## shape(?, 14, 14, 512)
+pooled_grads = K.mean(grads, axis=(0, 1, 2))   ## 这里的结果居然是对后面的（?,14, 14,)求平均值,大跌眼镜, 得到shape（512,）
+
+# Get values of pooled grads and model conv. layer output as Numpy arrays
 iterate = K.function([model.input], [pooled_grads, last_conv_layer.output[0]])
+## pooled_grads_value shape：512, conv_layer_output_value(14, 14, 512),两个numpyarray
 pooled_grads_value, conv_layer_output_value = iterate([x])
-for i in range(512):
-    conv_layer_output_value[:, :, i] *= pooled_grads_value[i]
+
+# Multiply each channel in the feature-map array by "how important it is"
+for i in range(pooled_grads_value.shape[0]):   #pooled_grads_value.shape[0]：512
+    conv_layer_output_value[:, :, i] *= pooled_grads_value[i]   # 加权后的shape依然是(14, 14, 512)
 
 #  然后，我们沿着通道维度对加权的特征图求均值，从而得到大小为 14*14 的热力图。最后，我们对热力图进行归一化处理，以使其值在 0 和 1 之间。
-heatmap = np.mean(conv_layer_output_value, axis=-1)
+heatmap = np.mean(conv_layer_output_value, axis=-1)  #对最后一维进行取平均,得到 （14,14）
 heatmap = np.maximum(heatmap, 0)
 heatmap /= np.max(heatmap)
 
+print(heatmap.shape)
 # 最后，我们使用 OpenCV 来读图片，将获取的热力图放缩到原图大小。我们将原图和热力图混合，以将热力图叠加到图像上。
 
 img = cv2.imread(img_path)
