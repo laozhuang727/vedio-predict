@@ -23,7 +23,7 @@ from scipy.stats import norm, skew, stats
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
-tf.enable_eager_execution()
+# tf.enable_eager_execution()
 
 import warnings
 import autopep8
