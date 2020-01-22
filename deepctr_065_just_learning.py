@@ -13,7 +13,6 @@ import datetime
 import pandas as pd
 import numpy as np
 
-import pandas_profiling as pdf
 import seaborn as sns
 import pandas as pd
 import numpy as np
@@ -23,7 +22,9 @@ from hyperopt import hp, fmin, rand, tpe, space_eval
 from scipy.stats import norm, skew, stats
 import matplotlib.pyplot as plt
 import tensorflow as tf
-import lightgbm as lgb
+
+tf.enable_eager_execution()
+
 import warnings
 import autopep8
 import random
@@ -41,6 +42,7 @@ from keras.models import Sequential
 from keras.datasets import mnist
 from keras import backend as K
 # from keras_radam import RAdam
+from tensorflow.python.keras.api._v1.keras import optimizers
 from tensorflow.python.keras.layers import TimeDistributed, Bidirectional, BatchNormalization
 from tqdm import tqdm
 
@@ -49,10 +51,12 @@ from deepctr.models import DeepFM
 from deepctr.inputs import SparseFeat, DenseFeat, get_feature_names, VarLenSparseFeat
 
 from collections import namedtuple
-# from bayes_opt import BayesianOptimization
+from bayes_opt import BayesianOptimization
 
 # 多个变量显示
 from IPython.core.interactiveshell import InteractiveShell
+
+from core.GradientDeepFM import GradientDeepFM, get_raw_input
 
 InteractiveShell.ast_node_interactivity = 'all'
 
@@ -85,6 +89,12 @@ path_pickle = path + 'pickle/'
 path_profile = path + 'profile/'
 
 
+# import tensorflow as tf
+# sess = tf.Session()
+#
+# from keras import backend as K
+# K.set_session(sess)
+
 def reduce_mem_usage(df, verbose=True):
     numerics = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
     start_mem = df.memory_usage().sum() / 1024 ** 2
@@ -116,24 +126,20 @@ def reduce_mem_usage(df, verbose=True):
     return df
 
 
-def split(key_ans, key2index):
-    for key in key_ans:
-        if key not in key2index:
-            # Notice : input value 0 is a special "padding",so we do not use 0 to encode valid feature for sequence input
-            key2index[key] = len(key2index) + 1
-    return list(map(lambda x: key2index[x], key_ans))
-
-
 if debug_small:
     train = pd.read_pickle(path_pickle + 'train_small.pickle')
     test = pd.read_pickle(path_pickle + 'test_small.pickle')
-    app = pd.read_pickle(path_pickle + 'app_small.pickle')
-    user = pd.read_pickle(path_pickle + 'user_small.pickle')
+    # app = pd.read_pickle(path_pickle + 'app.pickle')
+    # user = pd.read_pickle(path_pickle + 'user.pickle')
 else:
     train = pd.read_pickle(path_pickle + 'train.pickle')
     test = pd.read_pickle(path_pickle + 'test.pickle')
-    app = pd.read_pickle(path_pickle + 'app.pickle')
-    user = pd.read_pickle(path_pickle + 'user.pickle')
+
+    train = train[train.deviceid.str[-1] == '1']
+    test = test[test.deviceid.str[-1] == '1']
+
+    # app = pd.read_pickle(path_pickle + 'app.pickle')
+    # user = pd.read_pickle(path_pickle + 'user.pickle')
 
 print(test['ts'].isna().value_counts())
 
@@ -205,47 +211,12 @@ data.loc[data['ts_after_rank'] == np.inf, 'ts_after_rank'] = 0
 data['ts_before_len'] = np.log(data['ts_before_len'] + 1)
 data['ts_after_len'] = np.log(data['ts_after_len'] + 1)
 
-# 'deviceid'不唯一
-app = pd.read_pickle(path_pickle + 'app.pickle')
-app['applist'] = app['applist'].apply(lambda x: x[1:-2])
-group = app.groupby('deviceid')
-gps = group['applist'].apply(lambda x: list(set(' '.join(x).split(' '))))
-gps = pd.DataFrame(gps)
-key2index = {}
-gps['applist_key'] = list(map(lambda x: split(x, key2index), gps['applist']))
-gps['applist_len'] = gps['applist'].apply(lambda x: len(x))
-gps['applist_weight'] = gps['applist_len'].apply(lambda x: x * [1])
-gps.drop('applist', axis=1, inplace=True)
-print("applist total index:", len(key2index))
-data = pd.merge(data, gps, on=['deviceid'], how='left')
-
-#  ['deviceid', 'guid']唯一， 'deviceid'不唯一
-user = pd.read_pickle(path_pickle + 'user.pickle')
-for i in ['tag', 'outertag']:
-    user.loc[user['%s' % i].isna() == False, '%s_weight' % i] = user.loc[user['%s' % i].isna() == False, '%s' %
-                                                                         i].apply(
-        lambda x: [np.float16(i.split(':')[1]) if len(i.split(':')) == 2 else 0 for i in x.split('|')])
-    user.loc[user['%s' % i].isna() == False, '%s_key' % i] = user.loc[user['%s' % i].isna(
-    ) == False, '%s' % i].apply(lambda x: [i.split(':')[0] for i in x.split('|')])
-    user.loc[user['%s_weight' % i].isna() == False, '%s_len' % i] = user.loc[user['%s_weight' %
-                                                                                  i].isna() == False, '%s_weight' % i].apply(
-        lambda x: len(x))
-    key2index = {}
-    user.loc[user['%s_key' % i].isna() == False, '%s_key' % i] = list(
-        map(lambda x: split(x, key2index), user.loc[user['%s_key' % i].isna() == False, '%s_key' % i]))
-    user.drop(i, axis=1, inplace=True)
-    print(len(key2index))
-user['guid'].fillna('', inplace=True)
-data['guid'].fillna('', inplace=True)
-data = pd.merge(data, user, on=['deviceid', 'guid'], how='left')
-
 min_time = data['ts'].min()
 data['timestamp'] -= min_time
 data['ts'] -= min_time
 data['lat_int'] = np.int64(np.rint(data['lat'] * 100))
 data['lng_int'] = np.int64(np.rint(data['lng'] * 100))
-data.loc[data['level'].isna() == False, 'level_int'] = np.int64(
-    data.loc[data['level'].isna() == False, 'level'])
+
 group = data[['deviceid', 'lat', 'lng']].groupby('deviceid')
 gp = group[['lat', 'lng']].agg(lambda x: stats.mode(x)[0][0]).reset_index()
 gp.columns = ['deviceid', 'lat_mode', 'lng_mode']
@@ -258,29 +229,27 @@ data.loc[data['lat'] == data['lat_mode'], 'isLatSame'] = 1
 data.loc[data['lng'] != data['lng_mode'], 'isLngSame'] = 0
 data.loc[data['lng'] == data['lng_mode'], 'isLngSame'] = 1
 
-data.loc[data['personalscore'].isna(
-), 'personalscore'] = data['personalscore'].mode()
-
 data = reduce_mem_usage(data)
+
 # data.to_pickle(path_pickle + 'data.pickle')
 #
 # data = pd.read_pickle(path_pickle + 'data.pickle')
+# data = reduce_mem_usage(data)
 
 
 cate_cols = ['deviceid', 'guid', 'pos', 'app_version',
              'device_vendor', 'netmodel', 'osversion',
              'device_version', 'hour', 'minute', 'second',
-             'personalscore', 'gender', 'level_int', 'dist_int',
+             'dist_int',
              'lat_int', 'lng_int', 'gap_before_int', 'ts_before_group',
              'time1', 'gap_after_int', 'ts_after_group',
-             'personidentification']
+             ]
 drop_cols = ['id', 'target', 'timestamp', 'ts', 'isTest', 'day',
              'lat_mode', 'lng_mode', 'abtarget', 'applist_key',
              'applist_weight', 'tag_key', 'tag_weight', 'outertag_key',
              'outertag_weight', 'newsid']
 
-fillna_cols = ['outertag_len', 'tag_len', 'lng', 'lat', 'level',
-               'followscore', 'dist', 'applist_len', 'ts_before_rank',
+fillna_cols = ['lng', 'lat', 'dist', 'ts_before_rank',
                'ts_after_rank']
 data[fillna_cols] = data[fillna_cols].fillna(0)
 
@@ -289,40 +258,18 @@ train_index, val_index = train_test_split(train_index, test_size=0.2)
 test_index = data[data['isTest'] == 1].index
 isVarlen = False
 
-key2index_len = {'applist': 25730, 'tag': 32539, 'outertag': 192}
 
-varlen_list = {}
-max_len = {}
-for i in ['applist', 'tag', 'outertag']:
-    max_len[i] = int(data['%s_len' % i].max())
-#  pad_sequences 变长特征
-if isVarlen:
-    try:
-        print('read pad_sequences')
-        for i in ['applist', 'tag', 'outertag']:
-            varlen_list['%s_key' % i] = np.load(path_npy + '%s_key.npy' % i)
-            varlen_list['%s_weight' % i] = np.load(
-                path_npy + '%s_weight.npy' % i)
-            print(i)
-    except:
-        print('pad_sequences')
-        for i in ['applist', 'tag', 'outertag']:
-            data.loc[data['%s_key' % i].isna(), '%s_key' % i] = data.loc[data['%s_key' %
-                                                                              i].isna(), '%s_key' % i].apply(
-                lambda x: [0])
-            data.loc[data['%s_weight' % i].isna(), '%s_weight' % i] = data.loc[data['%s_weight' %
-                                                                                    i].isna(), '%s_weight' % i].apply(
-                lambda x: [0])
-            varlen_list['%s_key' % i] = pad_sequences(np.array(
-                data['%s_key' % i]), maxlen=max_len[i], padding='post')
-            varlen_list['%s_weight' % i] = pad_sequences(np.array(
-                data['%s_weight' % i]), maxlen=max_len[i], padding='post').reshape(len(data), max_len[i], 1)
-            np.save(path_npy + '%s_key.npy' % i, varlen_list['%s_key' % i])
-            np.save(path_npy + '%s_weight.npy' %
-                    i, varlen_list['%s_weight' % i])
-            print(i)
-else:
-    pass
+# gui 缺失值填充, 选相同的deviceid来填
+# data['guid'] = data['guid'].fillna('abc')
+
+def find_top1_in_group(x):
+    if x.count() <= 0:
+        return np.nan
+    return x.value_counts().index[0]
+
+
+data['guid'] = data.groupby('deviceid')['guid'].transform(find_top1_in_group)
+data['guid'] = data['guid'].fillna(data['guid'].value_counts().idxmax())
 
 sparse_features = cate_cols
 dense_features = [i for i in data.columns if (
@@ -331,6 +278,7 @@ target = 'target'
 
 # 1.Label Encoding for sparse features,and do simple Transformation for dense features
 for i in (sparse_features):
+    print(i)
     encoder = LabelEncoder()
     data[i] = encoder.fit_transform(data[i])
 
@@ -343,12 +291,7 @@ fixlen_feature_columns = [SparseFeat(feat, data[feat].nunique())
                           for feat in sparse_features] + [DenseFeat(feat, 1, )
                                                           for feat in dense_features]
 
-if isVarlen:
-    varlen_feature_columns = [VarLenSparseFeat('%s_key' % i, key2index_len[i] + 1, max_len[i],
-                                               'mean') for i in ['applist', 'tag', 'outertag']]
-    # 'mean', weight_name='%s_weight' % i) for i in ['applist', 'tag', 'outertag']]
-else:
-    varlen_feature_columns = []
+varlen_feature_columns = []
 
 dnn_feature_columns = fixlen_feature_columns + varlen_feature_columns
 linear_feature_columns = fixlen_feature_columns + varlen_feature_columns
@@ -364,15 +307,6 @@ train_model_input = {name: train[name] for name in feature_names}
 val_model_input = {name: val[name] for name in feature_names}
 test_model_input = {name: test[name] for name in feature_names}
 
-if isVarlen:
-    for i in ['applist', 'tag', 'outertag']:
-        for j in ['weight', 'key']:
-            print('%s_%s' % (i, j))
-            train_model_input['%s_%s' % (i, j)] = varlen_list['%s_%s' % (i, j)][train_index]
-            val_model_input['%s_%s' % (i, j)] = varlen_list['%s_%s' % (i, j)][val_index]
-            test_model_input['%s_%s' % (i, j)] = varlen_list['%s_%s' % (i, j)][test_index]
-            del varlen_list['%s_%s' % (i, j)]
-
 # 4.Define Model, train, predict and evaluate
 checkpoint_path = path_model + "cp.ckpt"
 checkpoint_dir = os.path.dirname(checkpoint_path)
@@ -380,20 +314,71 @@ cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
                                                  save_weights_only=True,
                                                  verbose=1)
 # 编译有错，临时去掉embedding_size=8,use_fm=True，编译不过
-model = DeepFM(linear_feature_columns, dnn_feature_columns, embedding_size=8,
-               use_fm=True, dnn_hidden_units=(256, 256, 256), l2_reg_linear=0.001,
-               l2_reg_embedding=0.001, l2_reg_dnn=0, init_std=0.0001, seed=1024,
-               dnn_dropout=0.5, dnn_activation='relu', dnn_use_bn=True, task='binary')
+model = GradientDeepFM(linear_feature_columns, dnn_feature_columns,
+                       fm_group=dnn_feature_columns, dnn_hidden_units=(256, 256, 256), l2_reg_linear=0.001,
+                       l2_reg_embedding=0.001, l2_reg_dnn=0, init_std=0.0001, seed=1024,
+                       dnn_dropout=0.5, dnn_activation='relu', dnn_use_bn=True, task='binary')
 try:
     model.load_weights(checkpoint_path);
     print('load weights')
 except:
     pass
-model.compile(optimizer="adam", loss="binary_crossentropy",
+
+adam = optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999, amsgrad=False)
+
+
+def keras_customize_loss(y_actual, y_predicted):
+    custom_loss_value = K.mean(K.sum(K.square((y_actual - y_predicted) / 10)))
+
+    # with tf.GradientTape() as tape:
+    #     # Simultaneously optimize trunk and head1 weights.
+    #     tape.watch(model.trainable_variables)
+    #
+    #     gradients = tape.gradient(custom_loss_value, model.trainable_variables)
+    #
+    #     for el in gradients:
+    #         print(el)
+
+    return custom_loss_value
+
+
+loss = tf.keras.losses.BinaryCrossentropy()
+
+
+# loss = keras_customize_loss
+
+
+class MyCustomCallback(tf.keras.callbacks.Callback):
+
+    def on_train_batch_begin(self, batch, logs=None):
+        print('Training: batch {} begins at {}'.format(batch, datetime.datetime.now().time()))
+
+    def on_train_batch_end(self, batch, logs=None):
+        print('Training: batch {} ends at {}'.format(batch, datetime.datetime.now().time()))
+
+    def on_test_batch_begin(self, batch, logs=None):
+        print('Evaluating: batch {} begins at {}'.format(batch, datetime.datetime.now().time()))
+
+    def on_test_batch_end(self, batch, logs=None):
+        print('Evaluating: batch {} ends at {}'.format(batch, datetime.datetime.now().time()))
+
+
+class LossHistory(tf.keras.callbacks.Callback):
+    def on_train_begin(self, logs={}):
+        self.losses = []
+
+    def on_train_end(self, batch):
+        self.losses.append(self.logs.get('loss'))
+
+
+LossHistory = MyCustomCallback()
+
+model.compile(optimizer=adam, loss=loss,
               metrics=['accuracy', 'AUC'])
 history = model.fit(train_model_input, train[target],
                     batch_size=8192, epochs=5, verbose=1, shuffle=True,
-                    callbacks=[cp_callback],
+                    # callbacks=[cp_callback],
+                    callbacks=[LossHistory],
                     validation_data=(val_model_input, val[target]))
 
 data['predict'] = 0
@@ -403,6 +388,48 @@ data.loc[val_index, 'predict'] = model.predict(
     val_model_input, batch_size=8192)
 data.loc[test_index, 'predict'] = model.predict(
     test_model_input, batch_size=8192)
+
+# train_loss, train_acc, train_auc = model.evaluate(train_model_input, train[target], batch_size=8192)
+
+
+predictions = model.predict(train_model_input, batch_size=8192)
+
+with tf.GradientTape(watch_accessed_variables=False) as tape:
+    # Simultaneously optimize trunk and head1 weights.
+    watch_var = list(filter(lambda x : x.name.startswith('linear0'), model.trainable_variables))
+    # watch_var = model.trainable_variables
+    tape.watch(watch_var)
+    # print(tape.watched_variables())
+
+    raw_input = get_raw_input(linear_feature_columns, dnn_feature_columns)
+    print("--------")
+    print(raw_input)
+
+    predictions = model(train_model_input)
+    # predictions = model.predict(tra in_model_input, batch_size=8192)
+    train_loss = loss(predictions, train[target])
+    print(train_loss)
+
+gradients = tape.gradient(predictions, watch_var)
+for el in gradients:
+    print("gradients el" + str(el))
+
+# train_loss, train_acc, train_auc = model.evaluate(train_model_input, train[target], batch_size=8192)
+# input_grads = K.gradients(loss, model.trainable_variables)
+
+
+#
+# print(input_grads)
+#
+# from keras import backend as K
+# sess = K.get_session()
+#
+# for el in input_grads:
+#     K.shape(el).eval(session=sess)
+#     # tf.keras.backend.get_value(el)
+#     el_value = K.print_tensor(el, message='el = ')
+#     print(el_value)
+
 
 p = 88.5
 pred_val = data.loc[val_index, 'predict']

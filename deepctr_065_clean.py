@@ -13,7 +13,6 @@ import datetime
 import pandas as pd
 import numpy as np
 
-import pandas_profiling as pdf
 import seaborn as sns
 import pandas as pd
 import numpy as np
@@ -23,7 +22,6 @@ from hyperopt import hp, fmin, rand, tpe, space_eval
 from scipy.stats import norm, skew, stats
 import matplotlib.pyplot as plt
 import tensorflow as tf
-import lightgbm as lgb
 import warnings
 import autopep8
 import random
@@ -72,7 +70,7 @@ pd.set_option('display.width', 50)
 # path = os.getcwd()
 
 # 简单测试流程联通性
-debug_small = False
+debug_small = True
 
 # 切记这里只能写绝对路径，不然np.save 会报文件不存在的错误
 path = "/Users/ryan/Downloads/data/"
@@ -120,8 +118,8 @@ def reduce_mem_usage(df, verbose=True):
 if debug_small:
     train = pd.read_pickle(path_pickle + 'train_small.pickle')
     test = pd.read_pickle(path_pickle + 'test_small.pickle')
-    app = pd.read_pickle(path_pickle + 'app_small.pickle')
-    user = pd.read_pickle(path_pickle + 'user_small.pickle')
+    app = pd.read_pickle(path_pickle + 'app.pickle')
+    user = pd.read_pickle(path_pickle + 'user.pickle')
 else:
     train = pd.read_pickle(path_pickle + 'train.pickle')
     test = pd.read_pickle(path_pickle + 'test.pickle')
@@ -219,9 +217,11 @@ data.loc[data['lng'] == data['lng_mode'], 'isLngSame'] = 1
 
 
 data = reduce_mem_usage(data)
+
 # data.to_pickle(path_pickle + 'data.pickle')
 #
 # data = pd.read_pickle(path_pickle + 'data.pickle')
+# data = reduce_mem_usage(data)
 
 
 cate_cols = ['deviceid', 'guid', 'pos', 'app_version',

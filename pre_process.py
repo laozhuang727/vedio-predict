@@ -24,7 +24,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
 
-path = "/media/ryan/F/deep-learning-data/turing/vedio-predict/"
+path = "/root/train-data/"
 path_sub = path + 'sub/'
 path_npy = path + 'npy/'
 path_data = path + 'raw/'
@@ -35,7 +35,7 @@ hdf5_pickle = path + 'hdf5/'
 path_profile = path + 'profile/'
 import vaex as vx
 
-debug_samll = False
+debug_samll = True
 debug_nrow = 10000
 
 

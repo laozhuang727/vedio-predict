@@ -258,3 +258,5 @@ dmypy.json
 .pyre/
 
 *.csv
+*.ipynb
+*/*.ipynb
