@@ -35,7 +35,7 @@ if debug_small:
     test = vaex.open(path_hdf5 + 'test_small.hdf5')
 else:
     train = vaex.open(path_hdf5 + 'train.hdf5')
-    test = vaex.open(path_hdf5 + 'test.hdf5')
+    test = vaex.open(path_hdf5 + 'heatmap.hdf5')
 
 
 # app = vaex.open(path_hdf5 + 'app.hdf5')
@@ -43,15 +43,15 @@ else:
 
 # 对数据进行排序
 # train = train.sort_values(['deviceid','guid','ts'])
-# test = test.sort_values(['deviceid','guid','ts'])
+# heatmap = heatmap.sort_values(['deviceid','guid','ts'])
 
 # 查看数据是否存在交集
 # train deviceid 104736
-# test deviceid 56681
-# train&test deviceid 46833
+# heatmap deviceid 56681
+# train&heatmap deviceid 46833
 # train guid 104333
-# test guid 56861
-# train&test guid 46654
+# heatmap guid 56861
+# train&heatmap guid 46654
 
 print("\n\n\ntrain:")
 print(" ==== train len: ", len(train))
@@ -59,19 +59,19 @@ print(train.describe())
 print(train.dtypes)
 
 
-print("\n\n\ntest:")
+print("\n\n\nheatmap:")
 new_int64_col = np.full([len(test)], dtype=np.int64, fill_value=np.nan)
 new_float64_col = np.full([len(test)], dtype=np.float64, fill_value=np.nan)
-print("==== test len: ", len(test))
+print("==== heatmap len: ", len(test))
 test['target'] = new_int64_col
 test['timestamp'] = new_float64_col
 
 print(test.describe())
 print(test.dtypes)
-# print(test.head(10))
+# print(heatmap.head(10))
 
 # print("\n\n\ndata:")
-# data = vaex.concat([train, test])
+# data = vaex.concat([train, heatmap])
 # print("==== data len: ", len(data))
 # print(data.describe())
 # print(data.get_column_names())
@@ -82,15 +82,15 @@ def analysis_device_guid():
     train_deviceid_set = set(train.evaluate(train.deviceid))
     print('train deviceid', len(train_deviceid_set))
     test_deviceid_set = set(test.evaluate(test.deviceid))
-    print('test deviceid', len(test_deviceid_set))
-    print('train&test deviceid', len(train_deviceid_set & test_deviceid_set))
+    print('heatmap deviceid', len(test_deviceid_set))
+    print('train&heatmap deviceid', len(train_deviceid_set & test_deviceid_set))
 
     train_guid_set = set(train.evaluate(train.guid))
     print('train guid', len(train_guid_set))
     test_guid_set = set(test.evaluate(test.guid))
-    print('test guid', len(test_guid_set))
+    print('heatmap guid', len(test_guid_set))
 
-    print('train&test guid', len(train_guid_set & test_guid_set))
+    print('train&heatmap guid', len(train_guid_set & test_guid_set))
 
     del train_deviceid_set
     del train_guid_set
@@ -119,28 +119,28 @@ train = train.materialize('datetime')
 test = test.materialize('datetime')
 
 # print("===============================")
-# print(test.describe())
-# print(test.dtypes)
+# print(heatmap.describe())
+# print(heatmap.dtypes)
 
 # train.data.datetime = train.evaluate(train.datetime)
 
-# test['datetime'] = test.apply(time_data2, arguments=[test['ts']])
+# heatmap['datetime'] = heatmap.apply(time_data2, arguments=[heatmap['ts']])
 # train.add_virtual_column('datetime', train['datetime'])
-# test['datetime'] = test.apply(time_data2, test['ts'])
+# heatmap['datetime'] = heatmap.apply(time_data2, heatmap['ts'])
 
 # train['datetime'] = train['ts'].apply(time_data2)
-# test['datetime'] = test['ts'].apply(time_data2)
+# heatmap['datetime'] = heatmap['ts'].apply(time_data2)
 # train['datetime'] = pd.to_datetime(train['datetime'])
-# test['datetime'] = pd.to_datetime(test['datetime'])
+# heatmap['datetime'] = pd.to_datetime(heatmap['datetime'])
 
 # 时间范围
 # train min: 2019-11-08 00:01:07, train max: 2019-11-10 23:55:51
-# test min: 2019-11-11 00:00:00, train max: 2019-11-11 23:59:44
+# heatmap min: 2019-11-11 00:00:00, train max: 2019-11-11 23:59:44
 # print("train min: {}, train max: {}".format(train['datetime'].min(), train['datetime'].max()))
-# print("test min: {0}, train max: {1}".format(test['datetime'].min(), test['datetime'].max()))
+# print("heatmap min: {0}, train max: {1}".format(heatmap['datetime'].min(), heatmap['datetime'].max()))
 print("train min day: {}, train max day: {}".format(train.min(train.datetime.dt.day),
                                                     train.max(train.datetime.dt.day)))
-print("test min day: {}, test max day: {}".format(test.min(test.datetime.dt.day),
+print("heatmap min day: {}, heatmap max day: {}".format(test.min(test.datetime.dt.day),
                                                   test.max(test.datetime.dt.day)))
 # 7     0.000000
 # 8     0.107774
@@ -159,7 +159,7 @@ test['days'] = test.datetime.dt.day
 
 print("train min: {}, train max: {}".format(time_data2(train.min(train.ts)),
                                             time_data2(train.max(train.ts))))
-print("test min: {}, test max: {}".format(time_data2(test.min(test.ts)),
+print("heatmap min: {}, heatmap max: {}".format(time_data2(test.min(test.ts)),
                                           time_data2(test.max(test.ts))))
 
 # print(train)
@@ -167,19 +167,19 @@ print("test min: {}, test max: {}".format(time_data2(test.min(test.ts)),
 # train.data.flag = train.data.days
 train['flag'] = train.datetime.dt.day
 test['flag'] = test.datetime.dt.day
-# # test['flag'] = 11
+# # heatmap['flag'] = 11
 # # 对Vaex的字段进行赋值
 new_int64_flag = np.full([len(test)], dtype=np.int64, fill_value=11)
 test['flag'] = new_int64_flag
 
 
-# test.data.flag = 11
+# heatmap.data.flag = 11
 
 # 8 9 10 11
-# data = pd.concat([train, test], axis=0, sort=False)
+# data = pd.concat([train, heatmap], axis=0, sort=False)
 data = vaex.concat([train, test])
 # print(data.head(3))
-# del train, test
+# del train, heatmap
 
 # 小时信息
 data['hour'] = data.datetime.dt.hour

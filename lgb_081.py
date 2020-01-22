@@ -53,7 +53,7 @@ if debug_small:
 
 else:
     train_df = pd.read_pickle(path_pickle + 'train.pickle')
-    test_df = pd.read_pickle(path_pickle + 'test.pickle')
+    test_df = pd.read_pickle(path_pickle + 'heatmap.pickle')
 
 
     # app = pd.read_pickle(path_pickle + 'app.pickle')
@@ -101,7 +101,7 @@ for f in ['date', 'exposure_click_gap', 'timestamp', 'ts', 'target', 'hour', 'mi
 print('runtime:', time.time() - t)
 
 
-print('=============================================== read test ===============================================')
+print('=============================================== read heatmap ===============================================')
 test_df['date'] = pd.to_datetime(
     test_df['ts'].apply(lambda x: time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(x / 1000)))
 )
@@ -358,7 +358,7 @@ clf.fit(
 )
 print('runtime:', time.time() - t)
 
-print('************** test predict **************')
+print('************** heatmap predict **************')
 sub = pd.read_csv(path_data + 'sample.csv')
 # sub['target'] = clf.predict_proba(test_df)[:, 1]
 tmp_df = clf.predict_proba(test_df)[:, 1]

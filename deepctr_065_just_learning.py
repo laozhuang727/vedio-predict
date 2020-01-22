@@ -133,7 +133,7 @@ if debug_small:
     # user = pd.read_pickle(path_pickle + 'user.pickle')
 else:
     train = pd.read_pickle(path_pickle + 'train.pickle')
-    test = pd.read_pickle(path_pickle + 'test.pickle')
+    test = pd.read_pickle(path_pickle + 'heatmap.pickle')
 
     train = train[train.deviceid.str[-1] == '1']
     test = test[test.deviceid.str[-1] == '1']

@@ -31,36 +31,36 @@ if debug_small:
     user = pd.read_pickle(path_pickle + 'user_small.pickle')
 else:
     train = pd.read_pickle(path_pickle + 'train.pickle')
-    test = pd.read_pickle(path_pickle + 'test.pickle')
+    test = pd.read_pickle(path_pickle + 'heatmap.pickle')
     app = pd.read_pickle(path_pickle + 'app.pickle')
     user = pd.read_pickle(path_pickle + 'user.pickle')
 
 
 # 对数据进行排序
 # train = train.sort_values(['deviceid','guid','ts'])
-# test = test.sort_values(['deviceid','guid','ts'])
+# heatmap = heatmap.sort_values(['deviceid','guid','ts'])
 
 # 查看数据是否存在交集
 # train deviceid 104736
-# test deviceid 56681
-# train&test deviceid 46833
+# heatmap deviceid 56681
+# train&heatmap deviceid 46833
 # train guid 104333
-# test guid 56861
-# train&test guid 46654
+# heatmap guid 56861
+# train&heatmap guid 46654
 
 @timeit
 def analysis_device_guid():
     train_deviceid_set = set(train['deviceid'])
     print('train deviceid', len(train_deviceid_set))
     test_deviceid_set = set(test['deviceid'])
-    print('test deviceid', len(test_deviceid_set))
-    print('train&test deviceid', len(train_deviceid_set & test_deviceid_set))
+    print('heatmap deviceid', len(test_deviceid_set))
+    print('train&heatmap deviceid', len(train_deviceid_set & test_deviceid_set))
 
     train_guid_set = set(train['guid'])
     print('train guid', len(train_guid_set))
     test_guid_set = set(test['guid'])
-    print('test guid', len((set(test['guid']))))
-    print('train&test guid', train_guid_set & test_guid_set)
+    print('heatmap guid', len((set(test['guid']))))
+    print('train&heatmap guid', train_guid_set & test_guid_set)
 
     del train_deviceid_set
     del test_deviceid_set

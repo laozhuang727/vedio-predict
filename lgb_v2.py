@@ -89,11 +89,11 @@ del train_df['target'], train_df['timestamp'], click_df['date'], click_df['hour'
 gc.collect()
 print('runtime:', time.time() - t)
 
-print('=============================================== read test ===============================================')
+print('=============================================== read heatmap ===============================================')
 if is_debug:
     test_df = pd.read_csv(path_data + 'test_small.csv')
 else:
-    test_df = pd.read_csv(path_data + 'test.csv')
+    test_df = pd.read_csv(path_data + 'heatmap.csv')
 test_df['date'] = pd.to_datetime(
     test_df['ts'].apply(lambda x: time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(x / 1000)))
 )
@@ -368,7 +368,7 @@ clf.fit(
 )
 print('runtime:', time.time() - t)
 
-print('************** test predict **************')
+print('************** heatmap predict **************')
 if is_debug:
     sub = pd.read_csv(path_data+ 'sample_small.csv')
 else:

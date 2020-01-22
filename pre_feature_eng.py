@@ -34,7 +34,7 @@ if debug_small:
     user = pd.read_pickle(path_pickle + 'user_small.pickle')
 else:
     train = pd.read_pickle(path_pickle + 'train.pickle')
-    test = pd.read_pickle(path_pickle + 'test.pickle')
+    test = pd.read_pickle(path_pickle + 'heatmap.pickle')
     app = pd.read_pickle(path_pickle + 'app.pickle')
     user = pd.read_pickle(path_pickle + 'user.pickle')
 

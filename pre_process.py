@@ -45,7 +45,7 @@ def build_pickle():
         train.to_pickle(path_pickle + "train_small.pickle")
         print("success build train_small.pickle")
 
-        test = pd.read_csv(path_data + 'test.csv', nrows=debug_nrow)
+        test = pd.read_csv(path_data + 'heatmap.csv', nrows=debug_nrow)
         test.to_pickle(path_pickle + "test_small.pickle")
         print("success build test_small.pickle")
 
@@ -65,9 +65,9 @@ def build_pickle():
         train.to_pickle(path_pickle + "train.pickle")
         print("success build train.pickle")
 
-        test = pd.read_csv(path_data + 'test.csv')
-        test.to_pickle(path_pickle + "test.pickle")
-        print("success build test.pickle")
+        test = pd.read_csv(path_data + 'heatmap.csv')
+        test.to_pickle(path_pickle + "heatmap.pickle")
+        print("success build heatmap.pickle")
 
         sample = pd.read_csv(path_data + 'sample.csv')
         sample.to_pickle(path_pickle + "sample.pickle")
@@ -125,9 +125,9 @@ def export_hdf5():
         train.export_hdf5(hdf5_pickle + "train.hdf5", progress=True)
         print("success build train.hdf5")
 
-        test = vx.open(path_data + 'test.csv')
-        test.export_hdf5(hdf5_pickle + "test.hdf5", progress=True)
-        print("success build test.hdf5")
+        test = vx.open(path_data + 'heatmap.csv')
+        test.export_hdf5(hdf5_pickle + "heatmap.hdf5", progress=True)
+        print("success build heatmap.hdf5")
 
         app = vx.open(path_data + 'app.csv')
         app.export_hdf5(hdf5_pickle + "app.hdf5", progress=True)
