@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 import pandas as pd
 import vaex
+import tensorflow as tf
 
 from core.utils import timeit
 
@@ -65,7 +66,6 @@ class MyTestCase(unittest.TestCase):
         print(df.describe())
         print(df.dtypes)
 
-
     def test_fillna(self):
         x = np.array([3, 1, np.nan, 10, np.nan])
         df = vaex.from_arrays(x=x)
@@ -89,6 +89,12 @@ class MyTestCase(unittest.TestCase):
         df = vaex.from_arrays(x=x, y=y)
         df = df.groupby(df.x, agg=None)
         print(df)
+
+    def test_multiply(self):
+        a = tf.constant([1, 2, 3, 4, 5, 6], shape=[2, 3])
+        print(a)
+        b4 = tf.constant([7, 8], shape=[2, 1])
+        print(b4)
 
     @timeit
     def test_hello_print(self):
@@ -121,5 +127,7 @@ class MyTestCase(unittest.TestCase):
         print(df.mean(df['new_col']))
         print(df.max(df['new_col']))
 
+
 if __name__ == '__main__':
     unittest.main()
+    # test_multiply()
