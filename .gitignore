@@ -259,5 +259,5 @@ dmypy.json
 
 *.csv
 *.ipynb
-*/*.ipynb
 
+!/.ipynb_checkpoints/

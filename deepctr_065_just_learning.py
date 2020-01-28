@@ -9,54 +9,28 @@ Author:
 # This Python 3 environment comes with many helpful analytics libraries installed
 # For example, here's several helpful packages to load in
 import datetime
-
-import pandas as pd
-import numpy as np
-
-import seaborn as sns
-import pandas as pd
-import numpy as np
 import os
 
-from hyperopt import hp, fmin, rand, tpe, space_eval
-from scipy.stats import norm, skew, stats
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 import tensorflow as tf
-
-# tf.enable_eager_execution()
-
-import warnings
-import autopep8
-import random
-
-from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
-from sklearn.preprocessing import MinMaxScaler, StandardScaler, LabelEncoder, OneHotEncoder
-from sklearn.metrics import roc_auc_score, auc, accuracy_score, log_loss, f1_score, precision_score, recall_score
-from sklearn import preprocessing
-
-from keras.layers import Dropout, Dense, LSTM
-from keras.preprocessing.sequence import pad_sequences
-from keras.utils import to_categorical
-from keras.callbacks import Callback
-from keras.models import Sequential
-from keras.datasets import mnist
-from keras import backend as K
-# from keras_radam import RAdam
-from tensorflow.python.keras.api._v1.keras import optimizers
-from tensorflow.python.keras.layers import TimeDistributed, Bidirectional, BatchNormalization
-from tqdm import tqdm
-
-import deepctr
-from deepctr.models import DeepFM
-from deepctr.inputs import SparseFeat, DenseFeat, get_feature_names, VarLenSparseFeat
-
-from collections import namedtuple
-from bayes_opt import BayesianOptimization
-
 # 多个变量显示
 from IPython.core.interactiveshell import InteractiveShell
+from deepctr.inputs import SparseFeat, DenseFeat, get_feature_names
+from keras import backend as K, models
+from scipy.stats import stats
+from sklearn.metrics import log_loss, f1_score
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+# from keras_radam import RAdam
+from tensorflow.python.keras.api._v1.keras import optimizers
+from tqdm import tqdm
 
 from core.GradientDeepFM import GradientDeepFM, get_raw_input
+
+# tf.enable_eager_execution()
 
 InteractiveShell.ast_node_interactivity = 'all'
 
@@ -79,7 +53,7 @@ pd.set_option('display.width', 50)
 debug_small = True
 
 # 切记这里只能写绝对路径，不然np.save 会报文件不存在的错误
-path = "/Users/ryan/Downloads/data/"
+path = "/media/ryan/F/deep-learning-data/turing/vedio-predict/"
 path_sub = path + 'sub/'
 path_npy = path + 'npy/'
 path_data = path + 'raw/'
@@ -390,6 +364,20 @@ data.loc[test_index, 'predict'] = model.predict(
     test_model_input, batch_size=8192)
 
 # train_loss, train_acc, train_auc = model.evaluate(train_model_input, train[target], batch_size=8192)
+
+tf.keras.utils.plot_model(model,  to_file='model_combined.png',show_shapes=True)
+
+# 此处，我们来看看顶部预测的特征图。所以我们得到图像的预测，并给得分靠前的类做个索引。
+# 每一个layer都有input 和 output
+# 请记住，我们可以为任意类计算特征图。然后，我们可以取出 VGG16 中最后一个卷积层的输出 block5_conv3的输出层。得到的特征图大小应该是 14×14×512。
+last_conv_layer = model.get_layer("prediction_layer")
+heatmap_model = models.Model([model.inputs], [last_conv_layer.output, model.output])
+
+with tf.GradientTape() as gtape:
+    conv_output, predictions = heatmap_model(train_model_input)
+    loss = predictions[:, np.argmax(predictions[0])]
+    grads = gtape.gradient(loss, conv_output)
+    pooled_grads = K.mean(grads, axis=(0, 1, 2))
 
 
 predictions = model.predict(train_model_input, batch_size=8192)
