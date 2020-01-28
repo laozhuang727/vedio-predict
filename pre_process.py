@@ -10,7 +10,7 @@ import pandas as pd
 
 from deepctr.inputs import VarLenSparseFeat
 
-path = "/media/ryan/F/deep-learning-data/turing/vedio-predict/"
+path = "/root/ryan/data/"
 path_sub = path + 'sub/'
 path_npy = path + 'npy/'
 path_data = path + 'raw/'
@@ -20,7 +20,7 @@ path_pickle = path + 'pickle/'
 hdf5_pickle = path + 'hdf5/'
 path_profile = path + 'profile/'
 
-debug_samll = True
+debug_samll = False
 debug_nrow = 10000
 
 
@@ -30,9 +30,9 @@ def build_pickle():
         train.to_pickle(path_pickle + "train_small.pickle")
         print("success build train_small.pickle")
 
-        # test = pd.read_csv(path_data + 'heatmap.csv', nrows=debug_nrow)
-        # test.to_pickle(path_pickle + "test_small.pickle")
-        # print("success build test_small.pickle")
+        test = pd.read_csv(path_data + 'test.csv', nrows=debug_nrow)
+        test.to_pickle(path_pickle + "test_small.pickle")
+        print("success build test_small.pickle")
 
         sample = pd.read_csv(path_data + 'sample.csv', nrows=debug_nrow)
         sample.to_pickle(path_pickle + "sample_small.pickle")
@@ -50,9 +50,9 @@ def build_pickle():
         train.to_pickle(path_pickle + "train.pickle")
         print("success build train.pickle")
 
-        # test = pd.read_csv(path_data + 'heatmap.csv')
-        # test.to_pickle(path_pickle + "heatmap.pickle")
-        # print("success build heatmap.pickle")
+        test = pd.read_csv(path_data + 'test.csv')
+        test.to_pickle(path_pickle + "test.pickle")
+        print("success build heatmap.pickle")
 
         sample = pd.read_csv(path_data + 'sample.csv')
         sample.to_pickle(path_pickle + "sample.pickle")
