@@ -258,6 +258,5 @@ dmypy.json
 .pyre/
 
 *.csv
-*.ipynb
 
-!/.ipynb_checkpoints/
+!.ipynb_checkpoints
